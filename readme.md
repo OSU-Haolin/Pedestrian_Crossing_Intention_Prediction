@@ -7,6 +7,8 @@ Paper in ArXiv: (to do) (will submit to IV 2021)
 
 This work improves the existing pedestrian crossing prediction method by considering global context into the model, and achieves the latest state-of-the-art performance.    
 
+This work is heavily based on `Kotseruba, Iuliia, Amir Rasouli, and John K. Tsotsos. "Benchmark for Evaluating Pedestrian Action Prediction." In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pp. 1258-1268, 2021.`
+
 ## Environment 
 
 python = 3.8  
