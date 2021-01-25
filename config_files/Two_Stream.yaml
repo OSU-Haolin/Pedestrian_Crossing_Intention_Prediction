@@ -1,0 +1,20 @@
+model_opts:
+  model: TwoStream
+  obs_input_type: [local_context]
+  apply_class_weights: True
+  normalize_boxes: True
+  generator: True
+  optical_flow_length: 10
+  fusion_point: early
+  fusion_method: sum
+net_opts:
+  num_hidden_units: 256
+  global_pooling: avg
+  regularizer_val: 0.0001
+  cell_type: gru
+  backbone: vgg16
+exp_opts:
+  datasets: [pie, jaad_all, jaad_beh]
+  batch_size: [16, 16, 16]
+  epochs: [60, 40, 40]
+  lr: [0.0000005, 0.0000005, 0.0000005]

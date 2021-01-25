@@ -1,0 +1,13 @@
+model_opts:
+  model: ConvLSTM
+  obs_input_type: [local_context]
+  apply_class_weights: True
+  normalize_boxes: True
+  generator: True
+net_opts:
+  backbone: vgg16
+exp_opts:
+  datasets: [pie, jaad_all, jaad_beh]
+  batch_size: [2, 2, 2]
+  epochs: [10, 20, 20]
+  lr: [0.00005, 0.000005, 0.000005]

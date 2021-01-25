@@ -1,0 +1,10 @@
+model_opts:
+  model: C3D
+  obs_input_type: [local_context]
+  apply_class_weights: True
+  generator: True
+exp_opts:
+  datasets: [pie, jaad_all, jaad_beh]
+  batch_size: [16, 16,16]
+  epochs: [40, 40, 40]
+  lr: [5.0e-05, 5.0e-06, 5.0e-06]
