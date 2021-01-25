@@ -34,6 +34,8 @@ Above operation will create a folder called `images` and save the extracted imag
 ```
 ## Training   
 
+Note: our model extracts the semantic mask via DeeplabV3 (you need download pretrained segmentation model [deeplabv3](http://download.tensorflow.org/models/deeplabv3_mnv2_cityscapes_train_2018_02_05.tar.gz) before training and put checkpoint file into this project's root directory (as `./deeplabv3_mnv2_cityscapes_train_2018_02_05.tar.gz`) so that the model can obtain the input semantic data).    
+
 Use `train_test.py` script with `config_file`:
 ```
 python train_test.py -c <config_file>
@@ -64,6 +66,8 @@ For example:
 ```
 python test_model.py models/jaad/MAS_PCPA/xxxx/
 ```  
+
+You can download our pretrained model [Google Drive (to do)](https://drive.google.com/drive/) for testing.  
 
 ## TODO Lists
 
