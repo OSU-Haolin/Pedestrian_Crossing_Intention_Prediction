@@ -1,4 +1,4 @@
-# Pedestrian Intention Estimation
+# Mask-PCPA: Pedestrian Crossing Prediction
 ## OSU-CITR
 
 ### Data process
