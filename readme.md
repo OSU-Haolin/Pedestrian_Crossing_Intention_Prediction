@@ -1,7 +1,9 @@
-# Mask-PCPA: Pedestrian Crossing Prediction
-## OSU-CITR
+# Mask-PCPA: Pedestrian Crossing Prediction  
+  
+## Notification
+OSU-CITR  
 
-### Data process
+## Data process
 
 Download the JAAD dataset, and then put the videos into `./dataset/JAAD_clips`. In order to use the data, first, the video clips should be converted into images. This can be done using script `./dataset/split_clips_to_frames.sh` or via interface as follows:
 ```
