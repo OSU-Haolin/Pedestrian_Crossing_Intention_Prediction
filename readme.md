@@ -1,7 +1,9 @@
 # Mask-PCPA: Pedestrian Crossing Prediction  
   
 ## Notification
-OSU-CITR  
+Mask-PCPA: Pedestrian Crossing Prediction Based on Local and Global Context.
+Paper in ArXiv: (to do) (will submit to IV 2021)
+This work improves the existing pedestrian crossing prediction method by considering global context into the model, and achieves the latest state-of-the-art performance.  
 
 ## Environment 
 
