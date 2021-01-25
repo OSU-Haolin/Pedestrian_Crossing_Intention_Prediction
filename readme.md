@@ -7,7 +7,7 @@ OSU-CITR
 
 python = 3.8  
 tensorflow-gpu = 2.2   
-numpy, opencv, PIL, matplotlib, etc
+numpy, opencv, PIL, matplotlib, etc  
 CPU-i7-6700K, GPU-RTX-2070super  
 
 ## Dataset Preparation  
@@ -49,8 +49,21 @@ The script will automatially save the trained model weights, configuration file 
 
 See comments in the `configs_default.yaml` and `action_predict.py` for parameter descriptions.
 
-Model-specific YAML files contain experiment options `exp_opts` that overwrite options in `configs_default.yaml`.
+Model-specific YAML files contain experiment options `exp_opts` that overwrite options in `configs_default.yaml`.  
 
+
+## Test saved model  
+
+To re-run test on the saved model use:  
+
+```
+python test_model.py <saved_files_path>
+```
+
+For example:  
+```
+python test_model.py models/jaad/MAS_PCPA/xxxx/
+```  
 
 ## TODO Lists
 
