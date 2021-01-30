@@ -98,7 +98,7 @@ def convert_to_fcn(model, classes=2, activation='softmax',
 
 
 def C3DNet(freeze_conv_layers=False, weights=None,
-           dense_activation='softmax', dropout=0.5, include_top=False):
+           dense_activation='softmax', dropout=0.5, include_top=False,input_data = Input(shape=(16, 112, 112, 3))):
     """
     C3D model implementation. Source: https://github.com/adamcasson/c3d
     Reference: Du Tran, Lubomir Bourdev, Rob Fergus, Lorenzo Torresani,and Manohar Paluri. 
@@ -112,7 +112,7 @@ def C3DNet(freeze_conv_layers=False, weights=None,
     Returns:
         C3D model
     """
-    input_data = Input(shape=(16, 112, 112, 3))
+    # input_data = Input(shape=(16, 112, 112, 3))
     model = Conv3D(64, 3, activation='relu', padding='same', name='conv1')(input_data)
     model = MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2), padding='valid', name='pool1')(model)
     # 2nd layer group
@@ -159,7 +159,7 @@ def C3DNet(freeze_conv_layers=False, weights=None,
 
 
 def C3DNet2(freeze_conv_layers=False, weights=None,
-           dense_activation='softmax', dropout=0.5, include_top=False):
+           dense_activation='softmax', dropout=0.5, include_top=False,input_data=Input(shape=(16, 112, 112, 3))):
     """
     C3D model implementation. Source: https://github.com/adamcasson/c3d
     Reference: Du Tran, Lubomir Bourdev, Rob Fergus, Lorenzo Torresani,and Manohar Paluri.
@@ -173,7 +173,9 @@ def C3DNet2(freeze_conv_layers=False, weights=None,
     Returns:
         C3D model
     """
-    input_data = Input(shape=(16, 112, 112, 3))
+    # Input(shape=data_sizes[i], name='input_' + data_types[i])
+    # input_data = Input(shape=(16, 112, 112, 3))
+
     model = Conv3D(64, 3, activation='relu', padding='same', name='conv1_2')(input_data)
     model = MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2), padding='valid', name='pool1_2')(model)
     # 2nd layer group
