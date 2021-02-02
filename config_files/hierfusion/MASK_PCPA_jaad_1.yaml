@@ -1,6 +1,6 @@
 model_opts:
-  model: MASK_PCPA_2
-  obs_input_type: [mask, local_box, pose, box, speed]
+  model: MASK_PCPA_3
+  obs_input_type: [mask, local_context, pose, box, speed]
   apply_class_weights: True
   normalize_boxes: True
   generator: True

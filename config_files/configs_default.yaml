@@ -1,0 +1,34 @@
+model_opts:
+  model: PCPA
+# SingleRNN, StackedRNN, MultiRNN, HierarchicalRNN, SFRNN, C3D, I3D, Static, ConvLSTM, ATGC, PCPA, MASK-PCPA
+  obs_input_type: [local_box, local_surround,  pose, box]
+  # [local_box, local_surround, local_context, pose, box, speed, scene_context]
+  enlarge_ratio: 1.5 # enlarging the original bounding box to capture local spatial context
+  obs_length: 16 # observation length
+  time_to_event: [30, 60]  # 30, 60, [30,60]
+  overlap: 0.8 # set to 0.6 for pie and 0.8 for jaad
+  balance_data: False # set to True to resample data so that the number of samples in each class is the same
+  apply_class_weights: True # apply class weights to offset class imbalance
+  dataset: jaad
+  normalize_boxes: True
+  generator: True # using generator is slower but uses less memory, otherwise up to 64GB RAM may be required to run some of the models
+  fusion_point: early # only for Two-Stream network
+  fusion_method: sum # only for Two-Stream network
+data_opts:
+  fstride: 1
+  sample_type: all  # beh or all only when model_opts/dataset is set to jaad
+  subset: default
+  data_split_type: default  # kfold, random, default
+  seq_type: crossing
+  min_track_size: 16 # tracks shorter than this length will be discarded
+net_opts:
+  num_hidden_units: 256
+  global_pooling: avg
+  regularizer_val: 0.0001
+  cell_type: gru
+  backbone: vgg16
+train_opts:
+  batch_size: 2
+  epochs: 20
+  lr: 0.000005
+  learning_scheduler:
