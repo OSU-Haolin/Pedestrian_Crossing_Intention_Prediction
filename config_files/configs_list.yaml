@@ -2,7 +2,7 @@ config_files list: (model architectures can be seen in ./model_imgs)
 
 1. baseline:
 PCPA_jaad -----> original PCPA model (3DCNN) model:PCPA
-PCPA_jaad_2d -----> PCPA + 2DCNN +RNN model:PCPA_2D
+PCPA_jaad_2d -----> PCPA (2DCNN +RNN) model:PCPA_2D
 
 2. earlyfusion:
 MASK_PCPA_jaad ---> PCPA + MASK (3DCNN)  model:MASK_PCPA_2
