@@ -341,7 +341,7 @@ class ActionPredict(object):
                         img_features = cv2.resize(img_data, target_dim)
                         if flip_image:
                             img_features = cv2.flip(img_features, 1)
-                    elif crop_type == 'context_cnn':
+                    elif crop_type == 'local_context_cnn':
                         img = image.load_img(imp, target_size=(224, 224))
                         x = image.img_to_array(img)
                         x = np.expand_dims(x, axis=0)
@@ -353,6 +353,46 @@ class ActionPredict(object):
                         # with tf.compact.v1.Session():
                         img_features = img_features.numpy()
 
+                    elif crop_type == 'mask_cnn':
+                        img_data = cv2.imread(imp)
+                        ori_dim = img_data.shape
+                        # bbox = jitter_bbox(imp, [b], 'enlarge', crop_resize_ratio)[0]
+                        # bbox = squarify(bbox, 1, img_data.shape[1])
+                        # bbox = list(map(int, bbox[0:4]))
+                        b = list(map(int, b[0:4]))
+                        ## img_data --- > mask_img_data (deeplabV3)
+                        original_im = Image.fromarray(cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB))
+                        resized_im, seg_map = segmodel.run(original_im)
+                        resized_im = np.array(resized_im)
+                        seg_image = label_to_color_image(seg_map).astype(np.uint8)
+                        seg_image = cv2.cvtColor(seg_image, cv2.COLOR_BGR2RGB)
+                        seg_image = cv2.addWeighted(resized_im, 0.5, seg_image, 0.5, 0)
+                        img_data = cv2.resize(seg_image, (ori_dim[1], ori_dim[0]))
+
+                        # ped_mask = np.zeros((b_org[3]-b_org[1],b_org[2]-b_org[0], 3), dtype="uint8")
+                        # ped_mask = init_canvas(b_org[3]-b_org[1], b_org[2]-b_org[0], color=(0, 0, 255))
+                        # img_data[b_org[1]:b_org[3], b_org[0]:b_org[2], :]
+                        ## mask_img_data + pd highlight ---> final_mask_img_data
+                        ped_mask = init_canvas(b[2] - b[0], b[3] - b[1], color=(255, 255, 255))
+                        # ped_fuse = cv2.addWeighted(img_data[b[1]:b[3], b[0]:b[2]], 0.5, ped_mask, 0.5, 0)
+                        img_data[b[1]:b[3], b[0]:b[2]] = ped_mask
+                        # cv2.imshow('mask_demo',img_data)
+                        # cv2.waitkey(0)
+                        # cv2.destroyAllWindows()
+                        img_features = cv2.resize(img_data, target_dim)
+                        img = Image.fromarray(cv2.cvtColor(img_features, cv2.COLOR_BGR2RGB))
+                        # img = image.load_img(imp, target_size=(224, 224))
+                        x = image.img_to_array(img)
+                        x = np.expand_dims(x, axis=0)
+                        x = tf.keras.applications.vgg19.preprocess_input(x)
+                        block4_pool_features = VGGmodel.predict(x)
+                        img_features = block4_pool_features
+                        img_features = tf.nn.avg_pool2d(img_features, ksize=[14, 14], strides=[1, 1, 1, 1], padding='VALID')
+                        img_features = tf.squeeze(img_features)
+                        # with tf.compact.v1.Session():
+                        img_features = img_features.numpy()
+                        if flip_image:
+                            img_features = cv2.flip(img_features, 1)
 
                     elif crop_type == 'mask':
                         img_data = cv2.imread(imp)
@@ -747,6 +787,8 @@ class ActionPredict(object):
         if 'local_box' in feature_type:
             data_gen_params['crop_type'] = 'bbox'
             data_gen_params['crop_mode'] = 'pad_resize'
+        elif 'mask_cnn' in feature_type:
+            data_gen_params['crop_type'] = 'mask_cnn'
         elif 'mask' in feature_type:
             data_gen_params['crop_type'] = 'mask'
             # data_gen_params['crop_mode'] = 'pad_resize'
@@ -4678,6 +4720,844 @@ class PCPA_2D(ActionPredict):
         net_model.summary()
         plot_model(net_model, to_file='PCPA_2D.png')
         return net_model
+
+class MASK_PCPA_2D(ActionPredict):
+
+    """
+    Class init function
+
+    Args:
+        num_hidden_units: Number of recurrent hidden layers
+        cell_type: Type of RNN cell
+        **kwargs: Description
+    """
+
+    def __init__(self,
+                 num_hidden_units=256,
+                 cell_type='gru',
+                 **kwargs):
+        """
+        Class init function
+
+        Args:
+            num_hidden_units: Number of recurrent hidden layers
+            cell_type: Type of RNN cell
+            **kwargs: Description
+        """
+        super().__init__(**kwargs)
+        # Network parameters
+        self._num_hidden_units = num_hidden_units
+        self._rnn = self._gru if cell_type == 'gru' else self._lstm
+        self._rnn_cell = GRUCell if cell_type == 'gru' else LSTMCell
+        # assert self._backbone in ['c3d', 'i3d'], 'Incorrect backbone {}! Should be C3D or I3D'.format(self._backbone)
+        self._3dconv = C3DNet if self._backbone == 'c3d' else I3DNet
+
+        # dropout = 0.0,
+        # dense_activation = 'sigmoid',
+        # freeze_conv_layers = False,
+        # weights = 'imagenet',
+        # num_classes = 1,
+        # backbone = 'vgg16',
+
+        # self._dropout = dropout
+        # self._dense_activation = dense_activation
+        # self._freeze_conv_layers = False
+        # self._weights = 'imagenet'
+        # self._num_classes = 1
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # self._backbone ='vgg16'
+
+    def get_data(self, data_type, data_raw, model_opts):
+        assert model_opts['obs_length'] == 16
+        model_opts['normalize_boxes'] = False
+        self._generator = model_opts.get('generator', False)
+        data_type_sizes_dict = {}
+        process = model_opts.get('process', True)
+        dataset = model_opts['dataset']
+        data, neg_count, pos_count = self.get_data_sequence(data_type, data_raw, model_opts)
+
+        data_type_sizes_dict['box'] = data['box'].shape[1:]
+        if 'speed' in data.keys():
+            data_type_sizes_dict['speed'] = data['speed'].shape[1:]
+        # if 'context_cnn' in data.keys():
+        #     data_type_sizes_dict['context_cnn'] = data['context_cnn'].shape[1:]
+
+        # Store the type and size of each image
+        _data = []
+        data_sizes = []
+        data_types = []
+
+        model_opts_3d = model_opts.copy()
+
+        for d_type in model_opts['obs_input_type']:
+            if 'local' in d_type or 'context' in d_type or 'mask' in d_type:
+                if self._backbone == 'c3d':
+                    model_opts_3d['target_dim'] = (112, 112)
+                model_opts_3d['process'] = False
+                features, feat_shape = self.get_context_data(model_opts_3d, data, data_type, d_type)
+            elif 'pose' in d_type:
+                path_to_pose, _ = get_path(save_folder='poses',
+                                           dataset=dataset,
+                                           save_root_folder='data/features')
+                features = get_pose(data['image'],
+                                    data['ped_id'],
+                                    data_type=data_type,
+                                    file_path=path_to_pose,
+                                    dataset=model_opts['dataset'])
+                feat_shape = features.shape[1:]
+            else:
+                features = data[d_type]
+                feat_shape = features.shape[1:]
+            _data.append(features)
+            data_sizes.append(feat_shape)
+            data_types.append(d_type)
+        # create the final data file to be returned
+        if self._generator:
+            _data = (DataGenerator(data=_data,
+                                   labels=data['crossing'],
+                                   data_sizes=data_sizes,
+                                   process=process,
+                                   global_pooling=None,
+                                   input_type_list=model_opts['obs_input_type'],
+                                   batch_size=model_opts['batch_size'],
+                                   shuffle=data_type != 'test',
+                                   to_fit=data_type != 'test'), data['crossing'])  # set y to None
+        # global_pooling=self._global_pooling,
+        else:
+            _data = (_data, data['crossing'])
+
+        return {'data': _data,
+                'ped_id': data['ped_id'],
+                'tte': data['tte'],
+                'image': data['image'],
+                'data_params': {'data_types': data_types, 'data_sizes': data_sizes},
+                'count': {'neg_count': neg_count, 'pos_count': pos_count}}
+
+    def get_model(self, data_params):
+        return_sequence = True
+        data_sizes = data_params['data_sizes']
+        data_types = data_params['data_types']
+        network_inputs = []
+        encoder_outputs = []
+        core_size = len(data_sizes)
+
+        # conv3d_model = self._3dconv()
+        # network_inputs.append(conv3d_model.input)
+        #
+        attention_size = self._num_hidden_units
+        #
+        # if self._backbone == 'i3d':
+        #     x = Flatten(name='flatten_output')(conv3d_model.output)
+        #     x = Dense(name='emb_' + self._backbone,
+        #               units=attention_size,
+        #               activation='sigmoid')(x)
+        # else:
+        #     x = conv3d_model.output
+        #     x = Dense(name='emb_' + self._backbone,
+        #               units=attention_size,
+        #               activation='sigmoid')(x)
+        #
+        # encoder_outputs.append(x)
+
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # # self._backbone = backbone
+        # data_size = data_params['data_sizes'][0]
+        # input_data = Input(shape=data_size, name='input_' + data_types[0])
+        # context_net = self._conv_models[self._backbone](input_tensor=input_data,input_shape=data_size,
+        #                                                 include_top=False, weights=self._weights,
+        #                                                 pooling=self._pooling)
+        # x=context_net.outputs[0]
+
+        network_inputs.append(Input(shape=data_sizes[0], name='input_cnn_' + data_types[0]))
+        encoder_outputs.append(
+            self._rnn(name='enc_' + data_types[0], r_sequence=return_sequence)(network_inputs[0]))
+
+        network_inputs.append(Input(shape=data_sizes[1], name='input_cnn2_' + data_types[1]))
+        encoder_outputs.append(
+            self._rnn(name='enc2_' + data_types[1], r_sequence=return_sequence)(network_inputs[1]))
+        # encoder_outputs.append(x)
+
+        # output = Dense(self._num_classes,
+        #                activation=self._dense_activation,
+        #                name='output_dense')(context_net.outputs[0])
+        # net_model = Model(inputs=context_net.inputs[0], outputs=output)
+
+
+        for i in range(2, core_size):
+            network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+            encoder_outputs.append(
+                self._rnn(name='enc_' + data_types[i], r_sequence=return_sequence)(network_inputs[i]))
+
+        if len(encoder_outputs) > 1:
+            att_enc_out = []
+            # x = Lambda(lambda x: K.expand_dims(x, axis=1))(encoder_outputs[0])
+            # att_enc_out.append(x)  # first output is from 3d conv netwrok
+            # # x = Lambda(lambda x: K.expand_dims(x, axis=1))(encoder_outputs[0])
+            # # att_enc_out.append(x)  # first output is from 3d conv netwrok
+
+            # for recurrent branches apply many-to-one attention block
+            for i, enc_out in enumerate(encoder_outputs[0:]):
+                x = attention_3d_block(enc_out, dense_size=attention_size, modality='_' + data_types[i])
+                x = Dropout(0.5)(x)
+                x = Lambda(lambda x: K.expand_dims(x, axis=1))(x)
+                att_enc_out.append(x)
+            # aplly many-to-one attention block to the attended modalities
+            x = Concatenate(name='concat_modalities', axis=1)(att_enc_out)
+            encodings = attention_3d_block(x, dense_size=attention_size, modality='_modality')
+
+            # print(encodings.shape)
+            # print(weights_softmax.shape)
+        else:
+            encodings = encoder_outputs[0]
+
+        model_output = Dense(1, activation='sigmoid',
+                             name='output_dense',
+                             activity_regularizer=regularizers.l2(0.001))(encodings)
+
+        net_model = Model(inputs=network_inputs,
+                          outputs=model_output)
+        net_model.summary()
+        plot_model(net_model, to_file='MASK_PCPA_2D.png')
+        return net_model
+
+class MASK_PCPA_2_2D(ActionPredict):
+
+    """
+    early fusion of MASK_PCPA
+
+    Class init function
+
+    Args:
+        num_hidden_units: Number of recurrent hidden layers
+        cell_type: Type of RNN cell
+        **kwargs: Description
+    """
+
+    def __init__(self,
+                 num_hidden_units=256,
+                 cell_type='gru',
+                 **kwargs):
+        """
+        Class init function
+
+        Args:
+            num_hidden_units: Number of recurrent hidden layers
+            cell_type: Type of RNN cell
+            **kwargs: Description
+        """
+        super().__init__(**kwargs)
+        # Network parameters
+        self._num_hidden_units = num_hidden_units
+        self._rnn = self._gru if cell_type == 'gru' else self._lstm
+        self._rnn_cell = GRUCell if cell_type == 'gru' else LSTMCell
+        # assert self._backbone in ['c3d', 'i3d'], 'Incorrect backbone {}! Should be C3D or I3D'.format(self._backbone)
+        self._3dconv = C3DNet if self._backbone == 'c3d' else I3DNet
+
+        # dropout = 0.0,
+        # dense_activation = 'sigmoid',
+        # freeze_conv_layers = False,
+        # weights = 'imagenet',
+        # num_classes = 1,
+        # backbone = 'vgg16',
+
+        # self._dropout = dropout
+        # self._dense_activation = dense_activation
+        # self._freeze_conv_layers = False
+        # self._weights = 'imagenet'
+        # self._num_classes = 1
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # self._backbone ='vgg16'
+
+    def get_data(self, data_type, data_raw, model_opts):
+        assert model_opts['obs_length'] == 16
+        model_opts['normalize_boxes'] = False
+        self._generator = model_opts.get('generator', False)
+        data_type_sizes_dict = {}
+        process = model_opts.get('process', True)
+        dataset = model_opts['dataset']
+        data, neg_count, pos_count = self.get_data_sequence(data_type, data_raw, model_opts)
+
+        data_type_sizes_dict['box'] = data['box'].shape[1:]
+        if 'speed' in data.keys():
+            data_type_sizes_dict['speed'] = data['speed'].shape[1:]
+        # if 'context_cnn' in data.keys():
+        #     data_type_sizes_dict['context_cnn'] = data['context_cnn'].shape[1:]
+
+        # Store the type and size of each image
+        _data = []
+        data_sizes = []
+        data_types = []
+
+        model_opts_3d = model_opts.copy()
+
+        for d_type in model_opts['obs_input_type']:
+            if 'local' in d_type or 'context' in d_type or 'mask' in d_type:
+                if self._backbone == 'c3d':
+                    model_opts_3d['target_dim'] = (112, 112)
+                model_opts_3d['process'] = False
+                features, feat_shape = self.get_context_data(model_opts_3d, data, data_type, d_type)
+            elif 'pose' in d_type:
+                path_to_pose, _ = get_path(save_folder='poses',
+                                           dataset=dataset,
+                                           save_root_folder='data/features')
+                features = get_pose(data['image'],
+                                    data['ped_id'],
+                                    data_type=data_type,
+                                    file_path=path_to_pose,
+                                    dataset=model_opts['dataset'])
+                feat_shape = features.shape[1:]
+            else:
+                features = data[d_type]
+                feat_shape = features.shape[1:]
+            _data.append(features)
+            data_sizes.append(feat_shape)
+            data_types.append(d_type)
+        # create the final data file to be returned
+        if self._generator:
+            _data = (DataGenerator(data=_data,
+                                   labels=data['crossing'],
+                                   data_sizes=data_sizes,
+                                   process=process,
+                                   global_pooling=None,
+                                   input_type_list=model_opts['obs_input_type'],
+                                   batch_size=model_opts['batch_size'],
+                                   shuffle=data_type != 'test',
+                                   to_fit=data_type != 'test'), data['crossing'])  # set y to None
+        # global_pooling=self._global_pooling,
+        else:
+            _data = (_data, data['crossing'])
+
+        return {'data': _data,
+                'ped_id': data['ped_id'],
+                'tte': data['tte'],
+                'image': data['image'],
+                'data_params': {'data_types': data_types, 'data_sizes': data_sizes},
+                'count': {'neg_count': neg_count, 'pos_count': pos_count}}
+
+    def get_model(self, data_params):
+        return_sequence = True
+        data_sizes = data_params['data_sizes']
+        data_types = data_params['data_types']
+        network_inputs = []
+        encoder_outputs = []
+        core_size = len(data_sizes)
+
+        # conv3d_model = self._3dconv()
+        # network_inputs.append(conv3d_model.input)
+        #
+        attention_size = self._num_hidden_units
+        #
+        # if self._backbone == 'i3d':
+        #     x = Flatten(name='flatten_output')(conv3d_model.output)
+        #     x = Dense(name='emb_' + self._backbone,
+        #               units=attention_size,
+        #               activation='sigmoid')(x)
+        # else:
+        #     x = conv3d_model.output
+        #     x = Dense(name='emb_' + self._backbone,
+        #               units=attention_size,
+        #               activation='sigmoid')(x)
+        #
+        # encoder_outputs.append(x)
+
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # # self._backbone = backbone
+        # data_size = data_params['data_sizes'][0]
+        # input_data = Input(shape=data_size, name='input_' + data_types[0])
+        # context_net = self._conv_models[self._backbone](input_tensor=input_data,input_shape=data_size,
+        #                                                 include_top=False, weights=self._weights,
+        #                                                 pooling=self._pooling)
+        # x=context_net.outputs[0]
+
+        # network_inputs.append(Input(shape=data_sizes[0], name='input_cnn_' + data_types[0]))
+        # encoder_outputs.append(
+        #     self._rnn(name='enc_' + data_types[0], r_sequence=return_sequence)(network_inputs[0]))
+        #
+        # network_inputs.append(Input(shape=data_sizes[1], name='input_cnn2_' + data_types[1]))
+        # encoder_outputs.append(
+        #     self._rnn(name='enc2_' + data_types[1], r_sequence=return_sequence)(network_inputs[1]))
+        # encoder_outputs.append(x)
+
+        # output = Dense(self._num_classes,
+        #                activation=self._dense_activation,
+        #                name='output_dense')(context_net.outputs[0])
+        # net_model = Model(inputs=context_net.inputs[0], outputs=output)
+
+        ##############################################
+        #### to do : earlyfusion
+        ###
+        earlyfusion = []
+        for i in range(0, core_size):
+            network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+            # network_inputs[i] = tf.cast(network_inputs[i], tf.int32, name='input_int32'+ data_types[i])
+            # result = tf.nn.conv2d(network_inputs[i], 3, [1,1,1,1],'SAME')
+            earlyfusion.append(network_inputs[i])
+
+        #     encoder_outputs.append(
+        #         self._rnn(name='enc_' + data_types[i], r_sequence=return_sequence)(network_inputs[i]))
+
+        # network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+
+        x = Concatenate(name='concat_early', axis=2)(earlyfusion)
+        x = tf.nn.l2_normalize(x, 2, epsilon=1e-12, name='norm_earlyfusion')
+        encoder_outputs.append(self._rnn(name='enc_earlyfusion', r_sequence=return_sequence)(x))
+        # att_enc_out = []
+        # if len(encoder_outputs) > 1:
+        #     for i, enc_out in enumerate(encoder_outputs[0:]):
+        #         x = attention_3d_block(enc_out, dense_size=attention_size, modality='_' + data_types[i])
+        #         x = Dropout(0.5)(x)
+        #         x = Lambda(lambda x: K.expand_dims(x, axis=1))(x)
+        #         att_enc_out.append(x)
+        #     # aplly many-to-one attention block to the attended modalities
+        #     x = Concatenate(name='concat_modalities', axis=1)(att_enc_out)
+        #     encodings = attention_3d_block(x, dense_size=attention_size, modality='_modality')
+        # else:
+        encodings = encoder_outputs[0]
+        encodings = attention_3d_block(encodings, dense_size=attention_size, modality='_modality')
+
+
+
+        # for i in range(2, core_size):
+        #     network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+        #     encoder_outputs.append(
+        #         self._rnn(name='enc_' + data_types[i], r_sequence=return_sequence)(network_inputs[i]))
+        #
+        # if len(encoder_outputs) > 1:
+        #     att_enc_out = []
+        #     # x = Lambda(lambda x: K.expand_dims(x, axis=1))(encoder_outputs[0])
+        #     # att_enc_out.append(x)  # first output is from 3d conv netwrok
+        #     # # x = Lambda(lambda x: K.expand_dims(x, axis=1))(encoder_outputs[0])
+        #     # # att_enc_out.append(x)  # first output is from 3d conv netwrok
+        #
+        #     # for recurrent branches apply many-to-one attention block
+        #     for i, enc_out in enumerate(encoder_outputs[0:]):
+        #         x = attention_3d_block(enc_out, dense_size=attention_size, modality='_' + data_types[i])
+        #         x = Dropout(0.5)(x)
+        #         x = Lambda(lambda x: K.expand_dims(x, axis=1))(x)
+        #         att_enc_out.append(x)
+        #     # aplly many-to-one attention block to the attended modalities
+        #     x = Concatenate(name='concat_modalities', axis=1)(att_enc_out)
+        #     encodings = attention_3d_block(x, dense_size=attention_size, modality='_modality')
+
+            # print(encodings.shape)
+            # print(weights_softmax.shape)
+        # else:
+        #     encodings = encoder_outputs[0]
+
+        model_output = Dense(1, activation='sigmoid',
+                             name='output_dense',
+                             activity_regularizer=regularizers.l2(0.001))(encodings)
+
+        net_model = Model(inputs=network_inputs,
+                          outputs=model_output)
+        net_model.summary()
+        plot_model(net_model, to_file='MASK_PCPA_2_2D.png')
+        return net_model
+
+
+
+class MASK_PCPA_3_2D(ActionPredict):
+
+    """
+    hierfusion MASK_PCPA
+    Class init function
+
+    Args:
+        num_hidden_units: Number of recurrent hidden layers
+        cell_type: Type of RNN cell
+        **kwargs: Description
+    """
+
+    def __init__(self,
+                 num_hidden_units=256,
+                 cell_type='gru',
+                 **kwargs):
+        """
+        Class init function
+
+        Args:
+            num_hidden_units: Number of recurrent hidden layers
+            cell_type: Type of RNN cell
+            **kwargs: Description
+        """
+        super().__init__(**kwargs)
+        # Network parameters
+        self._num_hidden_units = num_hidden_units
+        self._rnn = self._gru if cell_type == 'gru' else self._lstm
+        self._rnn_cell = GRUCell if cell_type == 'gru' else LSTMCell
+        # assert self._backbone in ['c3d', 'i3d'], 'Incorrect backbone {}! Should be C3D or I3D'.format(self._backbone)
+        self._3dconv = C3DNet if self._backbone == 'c3d' else I3DNet
+
+        # dropout = 0.0,
+        # dense_activation = 'sigmoid',
+        # freeze_conv_layers = False,
+        # weights = 'imagenet',
+        # num_classes = 1,
+        # backbone = 'vgg16',
+
+        # self._dropout = dropout
+        # self._dense_activation = dense_activation
+        # self._freeze_conv_layers = False
+        # self._weights = 'imagenet'
+        # self._num_classes = 1
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # self._backbone ='vgg16'
+
+    def get_data(self, data_type, data_raw, model_opts):
+        assert model_opts['obs_length'] == 16
+        model_opts['normalize_boxes'] = False
+        self._generator = model_opts.get('generator', False)
+        data_type_sizes_dict = {}
+        process = model_opts.get('process', True)
+        dataset = model_opts['dataset']
+        data, neg_count, pos_count = self.get_data_sequence(data_type, data_raw, model_opts)
+
+        data_type_sizes_dict['box'] = data['box'].shape[1:]
+        if 'speed' in data.keys():
+            data_type_sizes_dict['speed'] = data['speed'].shape[1:]
+        # if 'context_cnn' in data.keys():
+        #     data_type_sizes_dict['context_cnn'] = data['context_cnn'].shape[1:]
+
+        # Store the type and size of each image
+        _data = []
+        data_sizes = []
+        data_types = []
+
+        model_opts_3d = model_opts.copy()
+
+        for d_type in model_opts['obs_input_type']:
+            if 'local' in d_type or 'context' in d_type or 'mask' in d_type:
+                if self._backbone == 'c3d':
+                    model_opts_3d['target_dim'] = (112, 112)
+                model_opts_3d['process'] = False
+                features, feat_shape = self.get_context_data(model_opts_3d, data, data_type, d_type)
+            elif 'pose' in d_type:
+                path_to_pose, _ = get_path(save_folder='poses',
+                                           dataset=dataset,
+                                           save_root_folder='data/features')
+                features = get_pose(data['image'],
+                                    data['ped_id'],
+                                    data_type=data_type,
+                                    file_path=path_to_pose,
+                                    dataset=model_opts['dataset'])
+                feat_shape = features.shape[1:]
+            else:
+                features = data[d_type]
+                feat_shape = features.shape[1:]
+            _data.append(features)
+            data_sizes.append(feat_shape)
+            data_types.append(d_type)
+        # create the final data file to be returned
+        if self._generator:
+            _data = (DataGenerator(data=_data,
+                                   labels=data['crossing'],
+                                   data_sizes=data_sizes,
+                                   process=process,
+                                   global_pooling=None,
+                                   input_type_list=model_opts['obs_input_type'],
+                                   batch_size=model_opts['batch_size'],
+                                   shuffle=data_type != 'test',
+                                   to_fit=data_type != 'test'), data['crossing'])  # set y to None
+        # global_pooling=self._global_pooling,
+        else:
+            _data = (_data, data['crossing'])
+
+        return {'data': _data,
+                'ped_id': data['ped_id'],
+                'tte': data['tte'],
+                'image': data['image'],
+                'data_params': {'data_types': data_types, 'data_sizes': data_sizes},
+                'count': {'neg_count': neg_count, 'pos_count': pos_count}}
+
+    def get_model(self, data_params):
+        return_sequence = True
+        data_sizes = data_params['data_sizes']
+        data_types = data_params['data_types']
+        network_inputs = []
+        encoder_outputs = []
+        core_size = len(data_sizes)
+
+        # conv3d_model = self._3dconv()
+        # network_inputs.append(conv3d_model.input)
+        #
+        attention_size = self._num_hidden_units
+        #
+        # if self._backbone == 'i3d':
+        #     x = Flatten(name='flatten_output')(conv3d_model.output)
+        #     x = Dense(name='emb_' + self._backbone,
+        #               units=attention_size,
+        #               activation='sigmoid')(x)
+        # else:
+        #     x = conv3d_model.output
+        #     x = Dense(name='emb_' + self._backbone,
+        #               units=attention_size,
+        #               activation='sigmoid')(x)
+        #
+        # encoder_outputs.append(x)
+
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # # self._backbone = backbone
+        # data_size = data_params['data_sizes'][0]
+        # input_data = Input(shape=data_size, name='input_' + data_types[0])
+        # context_net = self._conv_models[self._backbone](input_tensor=input_data,input_shape=data_size,
+        #                                                 include_top=False, weights=self._weights,
+        #                                                 pooling=self._pooling)
+        # x=context_net.outputs[0]
+
+        # network_inputs.append(Input(shape=data_sizes[0], name='input_cnn_' + data_types[0]))
+        # encoder_outputs.append(
+        #     self._rnn(name='enc_' + data_types[0], r_sequence=return_sequence)(network_inputs[0]))
+        #
+        # network_inputs.append(Input(shape=data_sizes[1], name='input_cnn2_' + data_types[1]))
+        # encoder_outputs.append(
+        #     self._rnn(name='enc2_' + data_types[1], r_sequence=return_sequence)(network_inputs[1]))
+        # encoder_outputs.append(x)
+
+        # output = Dense(self._num_classes,
+        #                activation=self._dense_activation,
+        #                name='output_dense')(context_net.outputs[0])
+        # net_model = Model(inputs=context_net.inputs[0], outputs=output)
+
+
+        # for i in range(2, core_size):
+        #     network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+        #     encoder_outputs.append(
+        #         self._rnn(name='enc_' + data_types[i], r_sequence=return_sequence)(network_inputs[i]))
+
+        for i in range(0, core_size):
+            network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+            # network_inputs[i] = tf.cast(network_inputs[i], tf.int32, name='input_int32'+ data_types[i])
+            # result = tf.nn.conv2d(network_inputs[i], 3, [1,1,1,1],'SAME')
+
+        x = self._rnn(name='enc0_' + data_types[0], r_sequence=return_sequence)(network_inputs[0])
+        current = [x, network_inputs[1]]
+        x = Concatenate(name='concat_early1', axis=2)(current)
+        x = self._rnn(name='enc1_' + data_types[1], r_sequence=return_sequence)(x)
+        current = [x, network_inputs[2]]
+        x = Concatenate(name='concat_early2', axis=2)(current)
+        x = self._rnn(name='enc2_' + data_types[2], r_sequence=return_sequence)(x)
+        current = [x, network_inputs[3]]
+        x = Concatenate(name='concat_early3', axis=2)(current)
+        x = self._rnn(name='enc3_' + data_types[3], r_sequence=return_sequence)(x)
+        current = [x,network_inputs[4]]
+        x = Concatenate(name='concat_early4', axis=2)(current)
+        x = self._rnn(name='enc4_' + data_types[4], r_sequence=return_sequence)(x)
+        encoder_outputs.append(x)
+
+
+
+        if len(encoder_outputs) > 1:
+            att_enc_out = []
+            # x = Lambda(lambda x: K.expand_dims(x, axis=1))(encoder_outputs[0])
+            # att_enc_out.append(x)  # first output is from 3d conv netwrok
+            # # x = Lambda(lambda x: K.expand_dims(x, axis=1))(encoder_outputs[0])
+            # # att_enc_out.append(x)  # first output is from 3d conv netwrok
+
+            # for recurrent branches apply many-to-one attention block
+            for i, enc_out in enumerate(encoder_outputs[0:]):
+                x = attention_3d_block(enc_out, dense_size=attention_size, modality='_' + data_types[i])
+                x = Dropout(0.5)(x)
+                x = Lambda(lambda x: K.expand_dims(x, axis=1))(x)
+                att_enc_out.append(x)
+            # aplly many-to-one attention block to the attended modalities
+            x = Concatenate(name='concat_modalities', axis=1)(att_enc_out)
+            encodings = attention_3d_block(x, dense_size=attention_size, modality='_modality')
+
+            # print(encodings.shape)
+            # print(weights_softmax.shape)
+        else:
+            encodings = encoder_outputs[0]
+            encodings = attention_3d_block(encodings, dense_size=attention_size, modality='_modality')
+
+        model_output = Dense(1, activation='sigmoid',
+                             name='output_dense',
+                             activity_regularizer=regularizers.l2(0.001))(encodings)
+
+        net_model = Model(inputs=network_inputs,
+                          outputs=model_output)
+        net_model.summary()
+        plot_model(net_model, to_file='MASK_PCPA_3_2D.png')
+        return net_model
+
+
+class MASK_PCPA_4_2D(ActionPredict):
+
+    """
+    hierfusion MASK_PCPA
+    Class init function
+
+    Args:
+        num_hidden_units: Number of recurrent hidden layers
+        cell_type: Type of RNN cell
+        **kwargs: Description
+    """
+
+    def __init__(self,
+                 num_hidden_units=256,
+                 cell_type='gru',
+                 **kwargs):
+        """
+        Class init function
+
+        Args:
+            num_hidden_units: Number of recurrent hidden layers
+            cell_type: Type of RNN cell
+            **kwargs: Description
+        """
+        super().__init__(**kwargs)
+        # Network parameters
+        self._num_hidden_units = num_hidden_units
+        self._rnn = self._gru if cell_type == 'gru' else self._lstm
+        self._rnn_cell = GRUCell if cell_type == 'gru' else LSTMCell
+        # assert self._backbone in ['c3d', 'i3d'], 'Incorrect backbone {}! Should be C3D or I3D'.format(self._backbone)
+        self._3dconv = C3DNet if self._backbone == 'c3d' else I3DNet
+
+        # dropout = 0.0,
+        # dense_activation = 'sigmoid',
+        # freeze_conv_layers = False,
+        # weights = 'imagenet',
+        # num_classes = 1,
+        # backbone = 'vgg16',
+
+        # self._dropout = dropout
+        # self._dense_activation = dense_activation
+        # self._freeze_conv_layers = False
+        # self._weights = 'imagenet'
+        # self._num_classes = 1
+        # self._conv_models = {'vgg16': vgg16.VGG16, 'resnet50': resnet50.ResNet50, 'alexnet': AlexNet}
+        # self._backbone ='vgg16'
+
+    def get_data(self, data_type, data_raw, model_opts):
+        assert model_opts['obs_length'] == 16
+        model_opts['normalize_boxes'] = False
+        self._generator = model_opts.get('generator', False)
+        data_type_sizes_dict = {}
+        process = model_opts.get('process', True)
+        dataset = model_opts['dataset']
+        data, neg_count, pos_count = self.get_data_sequence(data_type, data_raw, model_opts)
+
+        data_type_sizes_dict['box'] = data['box'].shape[1:]
+        if 'speed' in data.keys():
+            data_type_sizes_dict['speed'] = data['speed'].shape[1:]
+        # if 'context_cnn' in data.keys():
+        #     data_type_sizes_dict['context_cnn'] = data['context_cnn'].shape[1:]
+
+        # Store the type and size of each image
+        _data = []
+        data_sizes = []
+        data_types = []
+
+        model_opts_3d = model_opts.copy()
+
+        for d_type in model_opts['obs_input_type']:
+            if 'local' in d_type or 'context' in d_type or 'mask' in d_type:
+                if self._backbone == 'c3d':
+                    model_opts_3d['target_dim'] = (112, 112)
+                model_opts_3d['process'] = False
+                features, feat_shape = self.get_context_data(model_opts_3d, data, data_type, d_type)
+            elif 'pose' in d_type:
+                path_to_pose, _ = get_path(save_folder='poses',
+                                           dataset=dataset,
+                                           save_root_folder='data/features')
+                features = get_pose(data['image'],
+                                    data['ped_id'],
+                                    data_type=data_type,
+                                    file_path=path_to_pose,
+                                    dataset=model_opts['dataset'])
+                feat_shape = features.shape[1:]
+            else:
+                features = data[d_type]
+                feat_shape = features.shape[1:]
+            _data.append(features)
+            data_sizes.append(feat_shape)
+            data_types.append(d_type)
+        # create the final data file to be returned
+        if self._generator:
+            _data = (DataGenerator(data=_data,
+                                   labels=data['crossing'],
+                                   data_sizes=data_sizes,
+                                   process=process,
+                                   global_pooling=None,
+                                   input_type_list=model_opts['obs_input_type'],
+                                   batch_size=model_opts['batch_size'],
+                                   shuffle=data_type != 'test',
+                                   to_fit=data_type != 'test'), data['crossing'])  # set y to None
+        # global_pooling=self._global_pooling,
+        else:
+            _data = (_data, data['crossing'])
+
+        return {'data': _data,
+                'ped_id': data['ped_id'],
+                'tte': data['tte'],
+                'image': data['image'],
+                'data_params': {'data_types': data_types, 'data_sizes': data_sizes},
+                'count': {'neg_count': neg_count, 'pos_count': pos_count}}
+
+    def get_model(self, data_params):
+        return_sequence = True
+        data_sizes = data_params['data_sizes']
+        data_types = data_params['data_types']
+        network_inputs = []
+        encoder_outputs = []
+        core_size = len(data_sizes)
+
+        # conv3d_model = self._3dconv()
+        # network_inputs.append(conv3d_model.input)
+        #
+        attention_size = self._num_hidden_units
+        for i in range(0, core_size):
+            network_inputs.append(Input(shape=data_sizes[i], name='input_' + data_types[i]))
+
+        x = self._rnn(name='enc0_' + data_types[0], r_sequence=return_sequence)(network_inputs[0])
+        encoder_outputs.append(x)
+        x = self._rnn(name='enc1_' + data_types[1], r_sequence=return_sequence)(network_inputs[1])
+        encoder_outputs.append(x)
+        x = self._rnn(name='enc2_' + data_types[2], r_sequence=return_sequence)(network_inputs[2])
+        # current = [x, network_inputs[1]]
+        # x = Concatenate(name='concat_early1', axis=2)(current)
+        # x = self._rnn(name='enc1_' + data_types[1], r_sequence=return_sequence)(x)
+        # current = [x, network_inputs[2]]
+        # x = Concatenate(name='concat_early2', axis=2)(current)
+        # x = self._rnn(name='enc2_' + data_types[2], r_sequence=return_sequence)(x)
+        current = [x, network_inputs[3]]
+        x = Concatenate(name='concat_early3', axis=2)(current)
+        x = self._rnn(name='enc3_' + data_types[3], r_sequence=return_sequence)(x)
+        current = [x,network_inputs[4]]
+        x = Concatenate(name='concat_early4', axis=2)(current)
+        x = self._rnn(name='enc4_' + data_types[4], r_sequence=return_sequence)(x)
+        encoder_outputs.append(x)
+
+
+
+        if len(encoder_outputs) > 1:
+            att_enc_out = []
+            # for recurrent branches apply many-to-one attention block
+            for i, enc_out in enumerate(encoder_outputs[0:]):
+                x = attention_3d_block(enc_out, dense_size=attention_size, modality='_' + data_types[i])
+                x = Dropout(0.5)(x)
+                x = Lambda(lambda x: K.expand_dims(x, axis=1))(x)
+                att_enc_out.append(x)
+            # aplly many-to-one attention block to the attended modalities
+            x = Concatenate(name='concat_modalities', axis=1)(att_enc_out)
+            encodings = attention_3d_block(x, dense_size=attention_size, modality='_modality')
+
+            # print(encodings.shape)
+            # print(weights_softmax.shape)
+        else:
+            encodings = encoder_outputs[0]
+            encodings = attention_3d_block(encodings, dense_size=attention_size, modality='_modality')
+
+        model_output = Dense(1, activation='sigmoid',
+                             name='output_dense',
+                             activity_regularizer=regularizers.l2(0.001))(encodings)
+
+        net_model = Model(inputs=network_inputs,
+                          outputs=model_output)
+        net_model.summary()
+        plot_model(net_model, to_file='MASK_PCPA_4_2D.png')
+        return net_model
+
+
 
 def action_prediction(model_name):
     for cls in ActionPredict.__subclasses__():

@@ -1,0 +1,20 @@
+config_files list: (model architectures can be seen in ./model_imgs)
+
+1. baseline:
+PCPA_jaad -----> original PCPA model (3DCNN) model:PCPA
+PCPA_jaad_2d -----> PCPA + 2DCNN +RNN model:PCPA_2D
+
+2. earlyfusion:
+MASK_PCPA_jaad ---> PCPA + MASK (3DCNN)  model:MASK_PCPA_2
+MASK_PCPA_jaad ---> PCPA + MASK (2DCNN +RNN) model:MASK_PCPA_2_2D
+
+3.hierfusion:
+MASK_PCPA_jaad ---> PCPA + MASK (3DCNN) model:MASK_PCPA_3
+MASK_PCPA_jaad ---> PCPA + Mask (2DCNN +RNN) model:MASK_PCPA_3_2D
+
+4.laterfusion:
+MASK_PCPA_jaad ---> PCPA + MASK (3DCNN) model:MASK_PCPA
+MASK_PCPA_jaad_2d ---> PCPA + MASK (2DCNN + RNN) model:MASK_PCPA_2D
+
+5.ours:
+MASK_PCPA_jaad_2d ---> PCPA + MASK (2DCNN + RNN) model:MASK_PCPA_4_2D
