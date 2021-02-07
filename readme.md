@@ -47,6 +47,8 @@ Use `train_test.py` script with `config_file`:
 python train_test.py -c <config_file>
 ```
 
+All config_files are saved in `./config_files` and you can review all offered model configs in `./config_files/config_list.yaml` and all offered model architectures in `./model_imgs` corresponding to configs.  
+
 For example, to train MASK_PCPA model run:  
 
 ```
