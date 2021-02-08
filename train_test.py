@@ -120,7 +120,7 @@ def run(config_file=None):
         if model_name in ['ConvLSTM']:
             configs['train_opts']['batch_size'] = 2
         if model_name in ['C3D', 'I3D']:
-            configs['train_opts']['batch_size'] = 16
+            configs['train_opts']['batch_size'] = 4
         if model_name in ['PCPA']:
             configs['train_opts']['batch_size'] = 1
         if 'MultiRNN' in model_name:
