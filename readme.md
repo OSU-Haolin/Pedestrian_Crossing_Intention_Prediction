@@ -1,4 +1,4 @@
-# MASK-PCPA: Pedestrian Crossing Intention Prediction  
+# Pedestrian Crossing Intention Prediction  
   
 ## Notification  
 
