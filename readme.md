@@ -10,7 +10,7 @@
 
 Paper in ArXiv: (to do) (submitted to IV 2021)  
 
-This work improves the existing pedestrian crossing prediction method and achieves the latest state-of-the-art performance.    
+This work improves the existing pedestrian crossing intention prediction method and achieves the latest state-of-the-art performance.    
 
 This work is heavily relied on the pedestrian action prediction benchmark: `Kotseruba, Iuliia, Amir Rasouli, and John K. Tsotsos. "Benchmark for Evaluating Pedestrian Action Prediction." In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pp. 1258-1268, 2021.`
 
