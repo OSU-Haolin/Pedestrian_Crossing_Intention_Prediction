@@ -2,12 +2,12 @@
   
 ## Notification  
 
-Fusing Local and Global Context for Pedestrian Crossing Prediction.  
-Paper in ArXiv: (to do) (will submit to IV 2021)  
+Pedestrian Crossing Intention Prediction with Feature Fusion and Spatio-Temporal Attention.
+Paper in ArXiv: (to do) (submited to IV 2021)  
 
-This work improves the existing pedestrian crossing prediction method by considering global context into the model, and achieves the latest state-of-the-art performance.    
+This work improves the existing pedestrian crossing prediction method and achieves the latest state-of-the-art performance.    
 
-This work is heavily relied on `Kotseruba, Iuliia, Amir Rasouli, and John K. Tsotsos. "Benchmark for Evaluating Pedestrian Action Prediction." In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pp. 1258-1268, 2021.`
+This work is heavily relied on the pedestrian action prediction benchmark: `Kotseruba, Iuliia, Amir Rasouli, and John K. Tsotsos. "Benchmark for Evaluating Pedestrian Action Prediction." In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pp. 1258-1268, 2021.`
 
 ## Environment 
 
