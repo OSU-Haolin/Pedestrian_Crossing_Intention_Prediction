@@ -2,7 +2,7 @@
   
 ## Notification  
 
-Pedestrian Crossing Intention Prediction with Feature Fusion and Spatio-Temporal Attention.
+**Pedestrian Crossing Intention Prediction with Feature Fusion and Spatio-Temporal Attention.**  
 Paper in ArXiv: (to do) (submited to IV 2021)  
 
 This work improves the existing pedestrian crossing prediction method and achieves the latest state-of-the-art performance.    
