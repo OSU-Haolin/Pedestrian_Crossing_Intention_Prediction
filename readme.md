@@ -2,7 +2,7 @@
   
 ## Notification  
 
-**Pedestrian Crossing Intention Prediction with Feature Fusion and Spatio-Temporal Attention.**  
+**Predicting Pedestrian Crossing Intention with Feature Fusion and Spatio-Temporal Attention.**  
 
 <p align="center">
 <img src="model.png" alt="Our proposed model" align="middle" width="800"/>
