@@ -72,7 +72,7 @@ python test_model.py <saved_files_path>
 
 For example:  
 ```
-python test_model.py models/jaad/MAS_PCPA/xxxx/
+python test_model.py models/jaad/MASK_PCPA/xxxx/
 ```  
 
 You can download our pretrained model [Google Drive (to do)](https://drive.google.com/drive/) for testing.  
