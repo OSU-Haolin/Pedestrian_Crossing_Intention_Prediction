@@ -14,7 +14,7 @@ This work is heavily relied on the pedestrian action prediction benchmark: `Kots
 python = 3.8  
 tensorflow-gpu = 2.2   
 numpy, opencv, PIL, matplotlib, etc  
-CPU-i7-6700K, GPU-RTX-2070super  
+CPU:i7-6700K, GPU:RTX-2070super  
 
 ## Dataset Preparation  
 
