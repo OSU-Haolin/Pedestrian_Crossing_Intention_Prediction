@@ -80,10 +80,11 @@ For example:
 python test_model.py models/jaad/MASK_PCPA/xxxx/
 ```  
 
-You can download our pretrained model [Google Drive (to do)](https://drive.google.com/drive/) for testing.  
+You can download our pretrained models from [Google Drive (to do)](https://drive.google.com/drive/)     
+or [BaiduDisk](https://pan.baidu.com/s/1GTvrcfe4a34sfwydVSQDqg) (password: v90h) for testing.    
 
 ## TODO Lists
 
 - [x] Readme Completion
-- [ ] Pretrained Model
+- [x] Pretrained Model
 - [ ] Support PIE Dataset
