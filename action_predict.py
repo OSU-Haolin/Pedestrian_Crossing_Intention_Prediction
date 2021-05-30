@@ -793,7 +793,7 @@ class ActionPredict(object):
             data_gen_params['crop_type'] = 'mask'
             # data_gen_params['crop_mode'] = 'pad_resize'
         elif 'local_context_cnn' in feature_type:
-            data_gen_params['crop_type'] = 'context_cnn'
+            data_gen_params['crop_type'] = 'local_context_cnn'
         elif 'local_context' in feature_type:
             data_gen_params['crop_type'] = 'context'
             data_gen_params['crop_resize_ratio'] = eratio
