@@ -80,7 +80,7 @@ For example:
 python test_model.py models/jaad/MASK_PCPA/xxxx/
 ```  
 
-You can download our pretrained models from [Google Drive (to do)](https://drive.google.com/drive/)     
+You can download our pretrained models from [Google Drive](https://drive.google.com/file/d/1pn4Ld873m8-R0mjOX99P7-ScN5J_ed9V/view)     
 or [BaiduDisk](https://pan.baidu.com/s/1GTvrcfe4a34sfwydVSQDqg) (password: v90h) for testing.    
 
 ## TODO Lists
