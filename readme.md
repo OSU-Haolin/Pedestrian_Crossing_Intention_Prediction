@@ -8,7 +8,7 @@
 <img src="model.png" alt="Our proposed model" align="middle" width="800"/>
 </p>
 
-Paper in ArXiv: https://arxiv.org/pdf/2104.05485v1.pdf (submitted to T-IV)  
+Paper in ArXiv: https://arxiv.org/pdf/2104.05485.pdf (submitted to T-IV)  
 
 This work improves the existing pedestrian crossing intention prediction method and achieves the latest state-of-the-art performance.    
 
