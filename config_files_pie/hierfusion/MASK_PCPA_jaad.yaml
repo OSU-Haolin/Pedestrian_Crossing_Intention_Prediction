@@ -1,6 +1,6 @@
 model_opts:
-  model: PCPA
-  obs_input_type: [local_context, pose, box, speed]
+  model: MASK_PCPA_3
+  obs_input_type: [mask, local_context, pose, box, speed]
   apply_class_weights: True
   normalize_boxes: True
   generator: True
@@ -11,8 +11,7 @@ net_opts:
   cell_type: gru
   backbone: c3d
 exp_opts:
-  datasets: [jaad_beh, jaad_all]
-  batch_size: [2, 2]
-  epochs: [40, 40]
-  lr: [5.0e-07, 5.0e-07]
-
+  datasets: [pie]
+  batch_size: [2]
+  epochs: [60]
+  lr: [5.0e-05]

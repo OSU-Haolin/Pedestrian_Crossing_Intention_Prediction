@@ -6,7 +6,6 @@ model_opts:
   enlarge_ratio: 1.5 # enlarging the original bounding box to capture local spatial context
   obs_length: 16 # observation length
   time_to_event: [30, 60]  # 30, 60, [30,60]
-  # time_to_event: [60, 90]  # 30, 60, [30,60]
   overlap: 0.8 # set to 0.6 for pie and 0.8 for jaad
   balance_data: False # set to True to resample data so that the number of samples in each class is the same
   apply_class_weights: True # apply class weights to offset class imbalance

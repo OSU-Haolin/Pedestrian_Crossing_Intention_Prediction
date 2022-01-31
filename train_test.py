@@ -4,6 +4,7 @@ import os
 import yaml
 import getopt
 import sys
+from numba import cuda 
 
 import numpy as np
 from tensorflow.keras import backend as K
@@ -14,7 +15,7 @@ from action_predict import ActionPredict
 
 from jaad_data import JAAD
 # if use PIE data:
-# from pie_data import PIE
+from pie_data import PIE
 import tensorflow as tf
 # tf.test.is_gpu_available()
 
@@ -24,9 +25,15 @@ for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
     tf.config.experimental.set_virtual_device_configuration(
         gpu,
-        [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
+        [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=7168)]
     )
 
+
+
+
+# path to JAAD dataset, please change to your local path
+path_jaad = "/home/steven/submission_T_IV/JAAD"
+path_pie = "/media/steven/MEDIA/PIE"
 
 # config = tf.compat.v1.ConfigProto()
 # # config.gpu_options.per_process_gpu_memory_fraction=0.8
@@ -101,6 +108,13 @@ def run(config_file=None):
 
     # update model and training options from the config file
     for dataset_idx, dataset in enumerate(model_configs['exp_opts']['datasets']):
+        
+        # # clear GPU memory
+        # device = cuda.get_current_device()
+        # device.reset()
+
+        # print('===> GPU memory cleared')
+
         configs['data_opts']['sample_type'] = 'beh' if 'beh' in dataset else 'all'
         configs['model_opts']['overlap'] = 0.6 if 'pie' in dataset else 0.8
         configs['model_opts']['dataset'] = dataset.split('_')[0]
@@ -129,14 +143,16 @@ def run(config_file=None):
             configs['train_opts']['batch_size'] = 16
 
         if configs['model_opts']['dataset'] == 'pie':
-            pass
+
             # imdb = PIE(data_path=os.environ.copy()['PIE_PATH'])
+            imdb = PIE(data_path=path_pie)
+
         elif configs['model_opts']['dataset'] == 'jaad':
             # if use docker:
             # imdb = JAAD(data_path=os.environ.copy()['JAAD_PATH'])
 
             # if use local path
-            imdb = JAAD(data_path='/home/haolin/CITR/PedestrianActionBenchmark/JAAD/')
+            imdb = JAAD(data_path=path_jaad)
 
         # get sequences
         beh_seq_train = imdb.generate_data_trajectory_sequence('train', **configs['data_opts'])

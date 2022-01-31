@@ -3325,7 +3325,7 @@ class TwoStreamFusion(ActionPredict):
 
         net_model = Model(inputs=[rgb_model.input, temporal_model.input],
                           outputs=output)
-        plot_model(net_model, to_file='model.png',
+        plot_model(net_model, to_file='model_imgs/model.png',
                    show_shapes=False, show_layer_names=False,
                    rankdir='TB', expand_nested=False, dpi=96)
 
@@ -3583,7 +3583,7 @@ class MASK_PCPA(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA.png')
         return net_model
 
 
@@ -3780,7 +3780,7 @@ class MASK_PCPA_2(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA_2.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA_2.png')
         return net_model
 
 
@@ -3988,7 +3988,7 @@ class MASK_PCPA_3(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA_3.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA_3.png')
         return net_model
 
 class  MASK_C3D(ActionPredict):
@@ -4176,7 +4176,7 @@ class  MASK_C3D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_C3D.png')
+        plot_model(net_model, to_file='model_imgs/MASK_C3D.png')
         return net_model
 
 class  ORI_C3D(ActionPredict):
@@ -4365,7 +4365,7 @@ class  ORI_C3D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='ORI_C3D.png')
+        plot_model(net_model, to_file='model_imgs/ORI_C3D.png')
         return net_model
 
 
@@ -4523,7 +4523,7 @@ class PCPA(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        # plot_model(net_model, to_file='MultiRNN3D_ATT.png')
+        plot_model(net_model, to_file='model_imgs/PCPA.png')
         return net_model
 
 class PCPA_2D(ActionPredict):
@@ -4718,7 +4718,7 @@ class PCPA_2D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='PCPA_2D.png')
+        plot_model(net_model, to_file='model_imgs/PCPA_2D.png')
         return net_model
 
 class MASK_PCPA_2D(ActionPredict):
@@ -4917,7 +4917,7 @@ class MASK_PCPA_2D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA_2D.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA_2D.png')
         return net_model
 
 class MASK_PCPA_2_2D(ActionPredict):
@@ -5151,7 +5151,7 @@ class MASK_PCPA_2_2D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA_2_2D.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA_2_2D.png')
         return net_model
 
 
@@ -5376,7 +5376,7 @@ class MASK_PCPA_3_2D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA_3_2D.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA_3_2D.png')
         return net_model
 
 
@@ -5554,7 +5554,7 @@ class MASK_PCPA_4_2D(ActionPredict):
         net_model = Model(inputs=network_inputs,
                           outputs=model_output)
         net_model.summary()
-        plot_model(net_model, to_file='MASK_PCPA_4_2D.png')
+        plot_model(net_model, to_file='model_imgs/MASK_PCPA_4_2D.png')
         return net_model
 
 
