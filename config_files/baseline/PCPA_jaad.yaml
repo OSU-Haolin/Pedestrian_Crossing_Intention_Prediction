@@ -12,7 +12,7 @@ net_opts:
   backbone: c3d
 exp_opts:
   datasets: [jaad_beh, jaad_all]
-  batch_size: [2, 2]
-  epochs: [40, 40]
+  batch_size: [1, 1]
+  epochs: [80, 80]
   lr: [5.0e-07, 5.0e-07]
 

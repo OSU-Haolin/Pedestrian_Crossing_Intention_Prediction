@@ -98,7 +98,7 @@ python train_test.py -c config_files/hierfusion/MASK_PCPA_jaad_2d.yaml  # ours7
 - PIE dataset: `run_all_on_pie.sh`
 
 ```shell
-# === run on JAAD datasets ===
+# === run on PIE datasets ===
 
 # benchmark comparison
 python train_test.py -c config_files/baseline/PCPA_jaad.yaml  # PCPA
